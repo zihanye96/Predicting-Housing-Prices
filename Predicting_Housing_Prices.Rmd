@@ -1,0 +1,576 @@
+---
+title: "Predicting Home Prices Using Advanced Regression Techniques"
+author: "Sohum Patnaik, Zihan Ye"
+date: "3/2/2018"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+#Introduction
+For this project, we explored a dataset on 1,460 residential homes in Ames, Iowa. The dataset contained 80 variables, such as the price that the home was sold for and characteristics of the house such as basement quality, overall square footage, and the exterior covering on the house. We used advanced regression techniques, namely generalized additive models, regression trees, random forests, and neural networks, in order to create a model that accurately predicts home prices using the provided information. Our goal for this project is to create a model that can predict the response variable most accurately with a (relatively) small number of predictor variables. This means that the predictor variables used in this model won't be redundant and will have low correlation with each other. The way we created our "best model" was through manual feature selection, choosing only the variables that appeared to have a strong effect on sale price and modifying certain categorical variables so that their levels are more intuitive. That way, we have a good balance between accuracy and complexity.     
+That being said, we recognize that there are other modelling techniques that result in models that are difficult to interpret but are accurate, potentially more so than our "best model." So, for these models, which in our case are regression trees, random forests, and neural networks, we will include all the variables we have so that we have all the information we would potentially need to make the most accurate prediction. So, for this project, we will create one "best interpretable model" and one "best difficult to interpret model. 
+
+#Methods
+As stated earlier, we will build four different models: the Generalized Additive Model (GAM), a regression tree, a random forest, and a neural network. The GAM will stay true to our criterion for the best model, and thus we will try to keep our model as small and interpretable as possible while staying accurate.     
+
+An initial exploration of the dataset makes it clear that there are many NA's in the dataset. These NA's can signal important information for our model, so it is important that we properly address them before fitting a model.     
+
+The NA's in many of the categorical variables indicated that what that variable was giving information about didn't exist. For example, NA for Alley meant there was no Alley. So for these variables, we added a new category named "None" put all the observations with NA's into that category for these variables. These variables are Alley, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, FireplaceQu, GarageType, GarageFinish, GarageQual, GarageCond, PoolQC, Fence, and MiscFeature.    
+
+Similarly, for GarageYearBlt, NA meant there was no Garage, but since GarageYearBlt is a quantitative variable, we couldn't add in a category, so we resorted to the single imputation method of replacing the NA's with the mean of the column. We know this method can be dangerous, but we didn't want to delete the rows with NA since the observations have valuable information and the single imputation method seemed to be the best alternative.     
+
+Likewise, for Electrical, we added an "Other" category where we put all the observations with NA since NA didn't necessarily mean that the house had no Electrical system. On the other hand, for LotFrontage, NA meant the house didn't have a lot, so we changed all the NA's in that column to 0. Both these approaches were different than how we treated MasVnrType and MasVnrArea, which had 8 observations that were NA. Since NA didn't necessarily mean the house didn't have any masonry veneer, and as 8 observations isn't a significant amount in a dataset of 1460 observations, we decided to remove those rows and then further explore the dataset.     
+
+
+The first step in building the GAM is to reduce our 81 variables into a subset that contains only the most important ones for predicting sale price. To do that, we first created a heatmap with all of the quantitative variables in the dataset and looked at which ones were most correlated with sale price. We then looked at the correlation amongst the variables that we chose and eliminated some variables that were highly correlated with others in the chosen set. Again, the best model to me means being able to predict the response variable most accurately with a (relatively) small number of predictor variables. This means that the predictor variables in my "best model" won't be redundant and will have low correlation with each other. The way we created our best model was through manual feature selection, choosing only the variables that appeared to have a strong effect on sale price. That way, we have a good balance between accuracy and complexity.            
+
+The variables that were most correlated with sale price (r>.8) are: GarageArea, GarageCars, Fireplaces, TotalRmsAbvGrd, FullBath, GrLivArea, 1stFlrSF, TotalBsmtSF, YearRemodAdd, YearBuilt, and OverallQual.       
+
+Looking at another heatmap with just these variables, we saw that Garage Area and GarageCars are correlated, so we removed GarageCars, which is a measurement of how many cars can fit in the garage. There are other pairs of variables, such as total number of rooms above ground and above ground living area, or total basement square footage and first floor square footage, that could potentially be correlated, but the relationships between these variables don't seem as direct as garage area and the number of cars that fit in the garage, so we won't remove any of these variables from our model.     
+
+After looking at the heatmaps, we examined the scatterplots between each quantitative predictor variable and sale price to check if we missed any non-linear relationships. We saw that BsmtFinSF1 looks like a non-linear variable, but considering how it's one of two components for total basement square footage, which we already have in our model, we won't include it.     
+
+The quantitative predictor variables we have now are: Garage Area, Fireplaces, Total Rooms Above Ground, Full Bath, Above Ground Living Area, 1st Floor Square Footage, Total Basement Square Footage, Remodel Date, Year Built, and Overall Quality. Here, we could have used principal component analysis to combine the predictors we have into a smaller set of variables, but this comes at the cost of interpretability. Each resulting principal component would be a linear combination of some subset of the predictors, and when we have a large number of predictors, the principal components are hard to interpret. Therefore, we decided not to use principal component analysis in building our first model, since we want something that's accurate while being interpretable. We will create a neural network later, which is also based on linear combinations of our predictors, to present an alternative model that may not be as interpretable but potentially more accurate.
+
+Now that we have a list of quantitative variables we want in our model, we thought about whether or not there are interactions between these variables and agreed that we should include an interaction term between year remodelled and year built. If a house did not have any remodelling done, then it will have the construction date as its year remodelled. Therefore, we will create a spline for this interaction in our generalized additive model.     
+
+We examined scatterplots of the relationships between each variable and sale price (using the plotExplore() function) and found that Garage Area, Year Built, and Overall Quality appear to have nonlinear relationships with sale price. Therefore, we used a generalized additive model to account for these nonlinear relationships.    
+
+Before we made our GAM, we also examined the 43 categorical variables in our dataset. We used plotExplore() to find the categorical variables that appear to have the strongest influence on price, leaving out the ones whose means are similar across all levels of that variable. We decided that Exterior1st, Exterior2nd, Exterior Quality, Basement Quality, Kitchen Quality, Neighborhood, and Saletype seem to have the largest effects. However, we saw that Exterior2nd is the exterior covering on the house if there's more than one material. Upon further examination, we saw that 1245 out of 1460 of our observations had the same category for Exterior1st and Exterior2nd, and that the mean sale price of the houses with the same categories for both variables doesn't differ significantly from the mean sale price of the houses with different categories between the two variables (180593 vs. 182820, although the sample sizes differ, it doesn't seem like there is a significant difference still), so we won't consider Exterior2nd, since it seems like a redundant variable.   
+
+Some of these categorical variables were problematic when cross-validating, as some levels did not have enough observations to do cross-validation with. Therefore, we decided to re-categorize the variables, grouping them into a smaller number of buckets. For example, with the neighborhood variable, we grouped the neighborhoods in four buckets: Low, MidLow, MidHigh, and High, with each level being representative of the average house price in that neighborhood. I did something similar with the SaleType variable, where I re-categorized the levels of SaleType into two buckets: low and high, based on the mean and the variability in sale price for each level of the original variable. Essentially, I wanted to group all of the levels of sale type that results in low sale prices together and all of the levels of sale type that results in high sale prices together. If a certain sale type results in a low sale price but also has high sale prices for some observations (ex. WD), I'll put it in the high category just because that sale type has the potential for high sale prices as well. Here's a more detailed explanation of all the re-categorizing we did for each categorical variable:     
+Exterior1st: Similar to neighborhood, except we split into 3 buckets: low, mid, high
+ExterQual: None of the houses were in "poor" condition, so we grouped fair houses with average/typical houses and good houses with excellent houses, since the distribution of sale prices for each new grouping seems similar.     
+BsmtQual: There are 37 observations that don't have basements. For these, we created a new level called NoBasement. We combined the observations that had fair basement quality and no basements together into a level called fairno, since their boxplots look similar.    
+
+We used the caret package to fit a GAM that includes the following variables: Garage Area, Fireplaces, Total Rooms Above Ground, Full Bath, Above Ground Living Area, 1st Floor Square Footage, Total Basement Square Footage, Remodel Date, Year Built, Overall Quality, Neighborhood, Sale Type, Exterior 1st, Exterior Quality, and Basement Quality.
+
+As stated earlier, in creating our regression tree, random forest, and neural network, we included all the variables we have so that we have all the information we would potentially need to make the most accurate prediction. Therefore, we gave the models all the variables in the dataset and allowed them to choose which ones were valuable to include through their respective criteria. We used the train() command in the caret package to fit these models as well. This was an automated process for the regression tree and the random forest, and for the neural network we used JMP to examine different combinations of hidden layers and nodes in each hidden layer to determine the configuration that results in the lowest RMSE. After converting our categorical variables to dummy variables and using JMP for model selection, we came upon two potential models: either we could use all our variables in a neural network with a single hidden layer of 7 nodes, or we could use the exact same variables we used for our linear regression and GAM models in a neural network with two hidden layers with 3 nodes each. Both models had approximately equal RMSE and there was no clear winner. Keeping interpretability as a tiebreaker, we used created our neural network with the same variables as our linear regression model and had two hidden layers with 3 nodes in each layer.     
+In the end, we chose the model that we submitted to Kaggle by looking at the prediction errors of each model using 5-fold cross validation. The random forest resulted in the least root mean squared error, so we chose that as our final model. However, the best model in our eyes is still the generalized additive model, as it's far more interpretable than the random forest, and only marginally worse in prediction (the GAM's RMSE is about $6000 higher).
+
+#Results
+After creating our models, we examined the 5-fold cross validation errors for each model to gauge their relative performance. Here are the root mean square errors we found using 5-fold cross validation:
+
+GAM: 35983.39      
+Regression Tree: 43597.32     
+Random Forest: 29547.63      
+Neural Network: 50198.56     
+
+As stated earlier, we chose the model we submitted to Kaggle solely based off of the RMSE criterion. Therefore, the random forest that we created using all of the predictor variables was our final model. While the RMSE for the random forest is approximately 30,000 dollars, most of these houses sell for between 130,000 dollars and 214,000 dollars, so I wouldn't say that the random forest's predictions are horribly off. That being said, 30,000 dollars is a large sum of money and can have significant impact on the purchasing decision.
+
+The test data that we used for our submission contained NA???s, so our random forest wasn???t able to make predictions for all of the observations in the dataset. After processing the data the same way we did with the training set, we found that there were 23 observations that contained NA???s, and thus couldn???t be predicted with the random forest. We used our GAM, which was the second best performing model, and the ???best model??? according to our criterion, to predict for these observations.
+
+#Ethical Considerations
+
+As we've seen through our models, the neighborhood that a property is in plays large role in the sale price of that property. This makes intuitive sense because demand for a property, which in turn drives property sale price, is influenced by local school districts, proximity to jobs, and availability of amenities such as retail stores, restaurants, parks, and pleasing views. However, it is important to further explore the role of neighborhood in determining a property's sale price.
+
+Many people argue that mixed-income neighborhoods are incredibly important for addressing disparities in opportunities presented to individuals living in economically segregated neighborhoods. A poor neighborhood in an economically segregated city generally has worse schools, fewer job opportunities, and more violence than rich neighborhoods. Those growing up in rich neighborhoods in these cities are able to attend well-resourced and well-funded schools, develop strong social networks that help with accessing economic opportunities, and be sheltered from common social problems in poorer communities. Those growing up in poor neighborhoods in these cities don't have the same opportunities. Including neighborhood as a feature in our model for determining the sale price of a home can exacerbate that.
+
+While our dataset shows that average sale prices of homes differ greatly by neighborhood in Ames, IA, census data shows that there is also great racial segregation by region in the town. The inclusion of Neighborhoods in our model as a feature can be especially problematic if the racial segregation in Ames is due to racial disparities in economic well-being.
+
+In 1971, Thomas Schelling proposed the "tipping point" model for neighborhoods. This model refers to the resegregation of integrated neighborhoods that occurs when white residents leave an integrated area because they deem the amount of non-white residents in that area to be unacceptable. In this model, every time a white resident leaves, they're replaced by a non-white resident and the demand for housing by white-residents reduces in that area until there are no more white families in that neighborhood.
+
+This idea of the "tipping point" model has influenced perceptions of the effects of racial-minority ownership on property values and has contributed to the dilemma of under-appreciation of minority-owned homes. 
+
+In areas with racial segregation, such as Ames, the neighborhood of a home can be used as a proxy for the race of the residents of that home, and using a model that incorporated neighborhood of a home for predicting Sale Price can be using race to determine Sale Price of a home. While there is no clear evidence of whether or not this is the case in our model fit on data for Ames, IA, it is important to be mindful of as we further investigate its possiblity and see the exact application of our model.
+
+
+#Discussion
+
+From the models that we created, we were able to get a sense of which variables affect sale prices the most. Looking at our regression tree, it appears that the most important variables are overall quality, exterior quality, garage cars, above ground living area, and year built. We used all of these variables in our GAM, with the exception of garage cars, which we represented with garage area. It makes sense that all these variables have significant effects on sale price, but through our visual exploration of the predictor variables, we also concluded that variables related to location, such as neighborhood, and other features such as basement condition and size and kitchen quality are important. While this dataset was limited to homes in Ames, Iowa and we as future statisticians don???t like to extrapolate, we nonetheless believe that these characteristics have similarly significant impacts on sale prices across the country, as it doesn???t make much sense for the preferences of homebuyers in Iowa to differ drastically from homebuyers elsewhere, especially considering that the 5 variables we found to be the most important are overall quality, exterior quality, garage cars, above ground living area, and year built, which we imagine should be important considerations for any homebuyer.
+
+After submitting our predictions to Kaggle, we got a room mean square logarithm error of .14528, which puts us as #2173 upon submission on the leaderboard. There is a total of 4255 submissions, so that puts us at the 49th percentile. Considering the fact that we are competing against more advanced data scientists (we???re assuming these are the kinds of people that participate in the competitions in the first place), we are proud of our achievement.
+
+
+#Code
+```{r,warning=FALSE,message=FALSE,results='hide'}
+#Required packages for our project
+require(mgcv)
+require(ggplot2)
+require(reshape2)
+require(plyr)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(neuralnet)
+require(caret)
+require(AppliedPredictiveModeling)
+#loading the dataset
+rawData<-read.csv("/Users/Zihanye 1/Desktop/train.csv")
+```
+
+###Dealing with NA's
+```{r}
+ProcessedData <- rawData
+
+# Alley
+levels(ProcessedData$Alley) <- c("Grvl", "Pave", "None")
+ProcessedData$Alley[which(is.na(ProcessedData$Alley))] <- "None"
+
+# MasVnrType, MasVnrArea
+# Already has None, so we can't assume that's what NA's mean. There are only 8 (those observations also have NA for MasVnrArea), so let's remove them.
+ProcessedData <- ProcessedData[-which(is.na(ProcessedData$MasVnrType)), ]
+summary(ProcessedData$MasVnrArea)
+
+# BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2
+# NA means no basement or for BsmtFinType2, there isn't more than 1
+levels(ProcessedData$BsmtQual) <- c("Ex", "Fa", "Gd", "TA", "None")
+ProcessedData$BsmtQual[which(is.na(ProcessedData$BsmtQual))] <- "None"
+
+levels(ProcessedData$BsmtCond) <- c("Fa", "Gd", "Po", "TA", "None")
+ProcessedData$BsmtCond[which(is.na(ProcessedData$BsmtCond))] <- "None"
+
+levels(ProcessedData$BsmtExposure) <- c("Av", "Gd", "Mn", "No", "None")
+ProcessedData$BsmtExposure[which(is.na(ProcessedData$BsmtExposure))] <- "None"
+
+levels(ProcessedData$BsmtFinType1) <- c("ALQ", "BLQ", "GLQ", "LwQ", "Rec", "Unf", "None")
+ProcessedData$BsmtFinType1[which(is.na(ProcessedData$BsmtFinType1))] <- "None"
+
+levels(ProcessedData$BsmtFinType2) <- c("ALQ", "BLQ", "GLQ", "LwQ", "Rec", "Unf", "None")
+ProcessedData$BsmtFinType2[which(is.na(ProcessedData$BsmtFinType2))] <- "None"
+
+# Electrical -- make it other
+levels(ProcessedData$Electrical) <- c("FuseA", "FuseF", "FuseP", "Mix", "SBrkr", "Other")
+ProcessedData$Electrical[which(is.na(ProcessedData$Electrical))] <- "Other"
+
+# FireplaceQu -- NA means no fireplace
+levels(ProcessedData$FireplaceQu) <- c("Ex", "Fa", "Gd", "Po", "TA", "None")
+ProcessedData$FireplaceQu[which(is.na(ProcessedData$FireplaceQu))] <- "None"
+
+# GarageType, GarageFinish, GarageQual, GarageCond -- NA means no garage
+levels(ProcessedData$GarageType) <- c("2Types", "Attchd", "Basment", "BuiltIn", "CarPort", "Detchd", "None")
+ProcessedData$GarageType[which(is.na(ProcessedData$GarageType))] <- "None"
+
+levels(ProcessedData$GarageFinish) <- c("Fin", "RFn", "Unf", "None")
+ProcessedData$GarageFinish[which(is.na(ProcessedData$GarageFinish))] <- "None"
+
+levels(ProcessedData$GarageQual) <- c("Ex", "Fa", "Gd", "Po", "TA", "None")
+ProcessedData$GarageQual[which(is.na(ProcessedData$GarageQual))] <- "None"
+
+levels(ProcessedData$GarageCond) <- c("Ex", "Fa", "Gd", "Po", "TA", "None")
+ProcessedData$GarageCond[which(is.na(ProcessedData$GarageCond))] <- "None"
+
+# Now we average the year for GarageYrBlt
+ProcessedData$GarageYrBlt[which(is.na(ProcessedData$GarageYrBlt))] <- round(mean(ProcessedData$GarageYrBlt, na.rm=TRUE))
+
+# PoolQC
+levels(ProcessedData$PoolQC) <- c("Ex", "Fa", "Gd", "None")
+ProcessedData$PoolQC[which(is.na(ProcessedData$PoolQC))] <- "None"
+
+# Fence
+levels(ProcessedData$Fence) <- c("GdPrv", "GdWo", "MnPrv", "MnWw", "None")
+ProcessedData$Fence[which(is.na(ProcessedData$Fence))] <- "None"
+
+# MiscFeature
+levels(ProcessedData$MiscFeature) <- c("Gar2", "Othr", "Shed", "TenC", "None")
+ProcessedData$MiscFeature[which(is.na(ProcessedData$MiscFeature))] <- "None"
+
+# Lot Frontage--NA means no lot, so Lot Frontage is 0
+ProcessedData$LotFrontage[which(is.na(ProcessedData$LotFrontage))] <- 0
+
+# re-name
+house <- ProcessedData
+```
+
+###Making our GAM
+```{r}
+#separating the quantitative and categorical variables
+numeric<-sapply(house,is.numeric)
+house.numeric <- house[,numeric]
+house.categorical <- cbind(house[,!numeric], SalePrice=house$SalePrice)
+qplot(x=Var1, y=Var2, data=melt(cor(house.numeric)),fill=value,geom="tile")
+
+vars<-c("GarageArea", "GarageCars", "Fireplaces", "TotRmsAbvGrd", "FullBath", "GrLivArea","X1stFlrSF","TotalBsmtSF","YearRemodAdd","YearBuilt","OverallQual")
+selectvars <- house[vars]
+qplot(x=Var1, y=Var2, data=melt(cor(selectvars)), fill=value, geom="tile")
+```
+
+```{r,echo=FALSE, results="hide",warning=FALSE,message=FALSE,error=FALSE, fig.keep='none'}
+plotExplore <- function(formula,data){
+    xvars <- attr(terms(formula,data=data),'term.labels')
+    yvar <- all.vars(formula)[1]
+    y <- data[,yvar]
+    xclasses <- sapply(xvars,function(x)class(data[,x]))
+    xuniqueval <- apply(data[,xvars],2,function(x) length(unique(x)))
+    xvars1 <- xvars[xclasses %in% c('numeric','integer') & xuniqueval > 3]
+    xvars2 <- xvars[xclasses %in% c('factor') | xuniqueval <= 3]
+
+    par(mfrow=c(ceiling(length(xvars)/3),3))
+    lapply(xvars1,function(x) X =   scatter.smooth(data[,x],y,
+    xlab=x,ylab=yvar,col='grey',lwd=2,pch=20,span = .7))
+    lapply(xvars2,function(x) boxplot(y~data[,x],xlab=x,ylab=yvar))
+    return()
+}
+```
+
+```{r,warning=FALSE}
+final<-c("GarageArea", "Fireplaces", "FullBath", "GrLivArea","X1stFlrSF","YearRemodAdd","YearBuilt","OverallQual")
+plotExplore(SalePrice ~ GarageArea+Fireplaces+FullBath+GrLivArea+X1stFlrSF+YearRemodAdd+YearBuilt+OverallQual, data=house)
+
+```
+
+```{r}
+plotExplore(SalePrice ~.,data=cbind(house.categorical[,1:9], SalePrice=house$SalePrice))
+plotExplore(SalePrice ~.,data=cbind(house.categorical[,10:18], SalePrice=house$SalePrice))
+plotExplore(SalePrice ~.,data=cbind(house.categorical[,19:27], SalePrice=house$SalePrice))
+plotExplore(SalePrice ~.,data=cbind(house.categorical[,28:36], SalePrice=house$SalePrice))
+plotExplore(SalePrice ~.,data=house.categorical[,37:44])
+```
+
+```{r}
+boxplot(SalePrice~Neighborhood, data=house, las=2)
+NeighborhoodMean <- tapply(house$SalePrice, house$Neighborhood, mean)
+summary(NeighborhoodMean)
+NeighbLow <- names(which(NeighborhoodMean <= 136800))
+NeighbMidLow <- names(which(NeighborhoodMean > 136800 & NeighborhoodMean <= 186600))
+NeighbMidHigh <- names(which(NeighborhoodMean > 186600 & NeighborhoodMean <= 212600))
+NeighbHigh <- names(which(NeighborhoodMean > 212600))
+#levels(house$Neighborhood)[levels(house$Neighborhood)==c(NeighbLow)] <- "Low"
+house$NH <- rep(NA,nrow(house))
+for(i in 1:dim(house)[1]){
+  if(house[i,"Neighborhood"]%in%NeighbLow){
+    house[i,"NH"]<-"Low"
+  } else if(house[i,"Neighborhood"]%in%NeighbMidLow){
+    house[i,"NH"]<-"MidLow"
+  } else if(house[i,"Neighborhood"]%in%NeighbMidHigh){
+    house[i,"NH"]<-"MidHigh"
+  } else if(house[i,"Neighborhood"]%in%NeighbHigh){
+    house[i,"NH"]<-"High"
+  }
+}
+house$NH <- factor(house$NH)
+```
+
+```{r}
+#New SaleType Variable
+house$ST <- rep(NA,nrow(house))
+SaleLow<- c("COD","ConLD","ConLI","ConLw", "Oth")
+SaleHigh <- c("New", "CWD", "WD", "Con")
+for(i in 1:dim(house)[1]){
+  if(house[i,"SaleType"]%in%SaleLow){
+    house[i,"ST"]<-"Low"
+  } else if(house[i,"SaleType"]%in%SaleHigh){
+    house[i,"ST"]<-"High"
+  }
+}
+house$ST <- factor(house$ST)
+```
+
+```{r}
+exterior <- data.frame(house$Id, house$Exterior1st, house$Exterior2nd)
+notSameIndex <- which(as.character(exterior[,2])!=as.character(exterior[,3]))
+sameIndex <- which(as.character(exterior[,2])==as.character(exterior[,3]))
+# 1245 of 1460 have same material
+mean(house$SalePrice[notSameIndex])
+mean(house$SalePrice[sameIndex])
+```
+
+```{r}
+ExtMean <- tapply(house$SalePrice, house$Exterior1st, mean)
+quantile(ExtMean,seq(0,1,.333333))
+ExtLow <- names(which(ExtMean <= 149701))
+ExtMid <- names(which(ExtMean > 149701 & ExtMean <= 182152))
+ExtHigh <- names(which(ExtMean > 182152))
+#levels(house$Neighborhood)[levels(house$Neighborhood)==c(NeighbLow)] <- "Low"
+house$Ext1st <- rep(NA,nrow(house))
+for(i in 1:dim(house)[1]){
+  if(house[i,"Exterior1st"]%in%ExtLow){
+    house[i,"Ext1st"]<-"Low"
+  } else if(house[i,"Exterior1st"]%in%ExtMid){
+    house[i,"Ext1st"]<-"Mid"
+  } else if(house[i,"Exterior1st"]%in%ExtHigh){
+    house[i,"Ext1st"]<-"High"
+  }
+}
+house$Ext1st <- factor(house$Ext1st)
+```
+
+```{r}
+house$bsmt <- house$BsmtQual
+levels(house$bsmt) <- c("Ex", "Fa", "Gd", "TA", "No")
+house$bsmt[which(is.na(house$bsmt))] <- "No"
+levels(house$bsmt)<-c("Ex", "FairNo", "Gd", "TA", "FairNo")
+summary(house$bsmt)
+```
+
+```{r}
+house$extQu <- house$ExterQual
+levels(house$extQu) <- c("Good", "Average", "Good", "Average")
+summary(house$extQu)
+```
+
+```{r}
+house$kitQu <- house$KitchenQual
+levels(house$kitQu) <- c("Good", "Average", "Good", "Average")
+summary(house$kitQu)
+```
+```{r}
+#Remove redundant categorical variables since we created new ones
+house2<-house
+remove<-c("KitchenQual","ExterQual","BsmtQual","Exterior1st","Neighborhood","SaleType")
+house2<-house2[,!(names(house2) %in% remove)]
+
+```
+
+```{r}
+set.seed(100)
+finalGAM <- train(SalePrice ~ GarageArea+Fireplaces+TotRmsAbvGrd+FullBath+GrLivArea+X1stFlrSF+TotalBsmtSF+YearRemodAdd+YearBuilt+OverallQual+NH+ST+Ext1st+bsmt+extQu+kitQu, data=house2, method = 'gam', trControl = trainControl("cv",5)) 
+finalGAM
+summary(finalGAM)
+```
+
+###Creating the Regression Tree
+```{r}
+regTree <- train(SalePrice ~ ., data = house2, method = 'rpart1SE', trControl = trainControl("cv",5))
+regTree
+summary(regTree)
+```
+
+###Creating the random forest
+
+```{r}
+rForest <- train(SalePrice~., data = house2, method = 'rf', trControl = trainControl("cv",5))
+rForest
+summary(rForest)
+```
+
+###Creating the Neural Network
+```{r}
+inclNnet<- c("GarageArea", "Fireplaces", "FullBath", "GrLivArea", "X1stFlrSF",
+             "YearRemodAdd", "YearBuilt", "OverallQual", "NH", "SaleType",
+             "GarageCars", "ExterQual", "TotalBsmtSF", "SalePrice")
+
+NNData <- data.frame(lapply(house2[, names(house2) %in% inclNnet], as.numeric))
+
+nnetGrid <- expand.grid(decay = c(0, .001, 0.01, .1), size = c(3,3))
+set.seed(0)
+nnetModel <- caret::train(SalePrice ~ ., data = NNData, method = 'nnet', 
+                          tuneGrid = nnetGrid, trControl = trainControl("cv",5), 
+                          preProc = c('center','scale'), linout = TRUE, trace = FALSE,
+                          MaxNWts = 5 * (ncol(NNData) + 1) + 5 + 1, maxit = 100)
+```
+
+
+###Re-processing test dataset
+```{r}
+test<-read.csv("/Users/Zihanye 1/Desktop/test.csv")
+ProcessedData <- test
+# Alley
+levels(ProcessedData$Alley) <- c("Grvl", "Pave", "None")
+ProcessedData$Alley[which(is.na(ProcessedData$Alley))] <- "None"
+
+
+# BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2
+# NA means no basement or for BsmtFinType2, there isn't more than 1
+levels(ProcessedData$BsmtQual) <- c("Ex", "Fa", "Gd", "TA", "None")
+ProcessedData$BsmtQual[which(is.na(ProcessedData$BsmtQual))] <- "None"
+
+levels(ProcessedData$BsmtCond) <- c("Fa", "Gd", "Po", "TA", "None")
+ProcessedData$BsmtCond[which(is.na(ProcessedData$BsmtCond))] <- "None"
+
+levels(ProcessedData$BsmtExposure) <- c("Av", "Gd", "Mn", "No", "None")
+ProcessedData$BsmtExposure[which(is.na(ProcessedData$BsmtExposure))] <- "None"
+
+levels(ProcessedData$BsmtFinType1) <- c("ALQ", "BLQ", "GLQ", "LwQ", "Rec", "Unf", "None")
+ProcessedData$BsmtFinType1[which(is.na(ProcessedData$BsmtFinType1))] <- "None"
+
+levels(ProcessedData$BsmtFinType2) <- c("ALQ", "BLQ", "GLQ", "LwQ", "Rec", "Unf", "None")
+ProcessedData$BsmtFinType2[which(is.na(ProcessedData$BsmtFinType2))] <- "None"
+
+# Electrical -- make it other
+levels(ProcessedData$Electrical) <- c("FuseA", "FuseF", "FuseP", "Mix", "SBrkr", "Other")
+ProcessedData$Electrical[which(is.na(ProcessedData$Electrical))] <- "Other"
+
+# FireplaceQu -- NA means no fireplace
+levels(ProcessedData$FireplaceQu) <- c("Ex", "Fa", "Gd", "Po", "TA", "None")
+ProcessedData$FireplaceQu[which(is.na(ProcessedData$FireplaceQu))] <- "None"
+
+# GarageType, GarageFinish, GarageQual, GarageCond -- NA means no garage
+levels(ProcessedData$GarageType) <- c("2Types", "Attchd", "Basment", "BuiltIn", "CarPort", "Detchd", "None")
+ProcessedData$GarageType[which(is.na(ProcessedData$GarageType))] <- "None"
+
+levels(ProcessedData$GarageFinish) <- c("Fin", "RFn", "Unf", "None")
+ProcessedData$GarageFinish[which(is.na(ProcessedData$GarageFinish))] <- "None"
+
+levels(ProcessedData$GarageQual) <- c("Ex", "Fa", "Gd", "Po", "TA", "None")
+ProcessedData$GarageQual[which(is.na(ProcessedData$GarageQual))] <- "None"
+
+levels(ProcessedData$GarageCond) <- c("Ex", "Fa", "Gd", "Po", "TA", "None")
+ProcessedData$GarageCond[which(is.na(ProcessedData$GarageCond))] <- "None"
+
+# Now we average the year for GarageYrBlt
+
+ProcessedData$GarageYrBlt[which(is.na(ProcessedData$GarageYrBlt))] <- round(mean(ProcessedData$GarageYrBlt, na.rm=TRUE))
+
+# PoolQC
+levels(ProcessedData$PoolQC) <- c("Ex", "Fa", "Gd", "None")
+ProcessedData$PoolQC[which(is.na(ProcessedData$PoolQC))] <- "None"
+
+# Fence
+levels(ProcessedData$Fence) <- c("GdPrv", "GdWo", "MnPrv", "MnWw", "None")
+ProcessedData$Fence[which(is.na(ProcessedData$Fence))] <- "None"
+
+# MiscFeature
+levels(ProcessedData$MiscFeature) <- c("Gar2", "Othr", "Shed", "TenC", "None")
+ProcessedData$MiscFeature[which(is.na(ProcessedData$MiscFeature))] <- "None"
+
+# Lot Frontage -- 0
+summary(ProcessedData[which(is.na(ProcessedData$LotFrontage)),]$LotConfig)
+ProcessedData$LotFrontage[which(is.na(ProcessedData$LotFrontage))] <- 0
+
+# MSZoning -- NA's become most populace category
+ProcessedData$MSZoning[which(is.na(ProcessedData$MSZoning))] <- as.factor("RL")
+
+# Utilities -- NA's become most populace category
+ProcessedData$Utilities[which(is.na(ProcessedData$Utilities))] <- as.factor("AllPub")
+
+# Exterior1st -- NA's become most populace category
+ProcessedData$Exterior1st[which(is.na(ProcessedData$Exterior1st))] <- as.factor("VinylSd")
+
+# Exterior2nd -- NA's become most populace category
+ProcessedData$Exterior2nd[which(is.na(ProcessedData$Exterior2nd))] <- as.factor("VinylSd")
+
+# MasVnrType
+ProcessedData$MasVnrType[which(is.na(ProcessedData$MasVnrType))] <- as.factor("None")
+
+# MasVnrArea
+ProcessedData$MasVnrArea[which(is.na(ProcessedData$MasVnrArea))] <- 0
+
+# BsmtFinSF1
+ProcessedData$BsmtFinSF1[which(is.na(ProcessedData$BsmtFinSF1))] <- 0
+
+# BsmtFinSF2
+ProcessedData$BsmtFinSF2[which(is.na(ProcessedData$BsmtFinSF2))] <- 0
+
+# BsmtUnfSF
+ProcessedData$BsmtUnfSF[which(is.na(ProcessedData$BsmtUnfSF))] <- 0
+
+# TotalBsmtSF
+ProcessedData$TotalBsmtSF[which(is.na(ProcessedData$TotalBsmtSF))] <- 0
+
+# BsmtFullBath
+ProcessedData$BsmtFullBath[which(is.na(ProcessedData$BsmtFullBath))] <- 0
+
+# BsmtHalfBath
+ProcessedData$BsmtHalfBath[which(is.na(ProcessedData$BsmtHalfBath))] <- 0
+
+# KitchenQual -- fit NA in most populace
+ProcessedData$KitchenQual[which(is.na(ProcessedData$KitchenQual))] <- as.factor("TA")
+
+# Functional
+ProcessedData$Functional[which(is.na(ProcessedData$Functional))] <- as.factor("Typ")
+
+# GarageCars
+ProcessedData$GarageCars[which(is.na(ProcessedData$GarageCars))] <- 0
+
+# GarageArea
+ProcessedData$GarageArea[which(is.na(ProcessedData$GarageArea))] <- 0
+
+# SaleType -- make NA most populace
+ProcessedData$SaleType[which(is.na(ProcessedData$SaleType))] <- as.factor("WD")
+
+# re-name
+house3 <- ProcessedData
+```
+
+```{r}
+house3$NH <- rep(NA,nrow(house3))
+for(i in 1:dim(house3)[1]){
+  if(house3[i,"Neighborhood"]%in%NeighbLow){
+    house3[i,"NH"]<-"Low"
+  } else if(house3[i,"Neighborhood"]%in%NeighbMidLow){
+    house3[i,"NH"]<-"MidLow"
+  } else if(house3[i,"Neighborhood"]%in%NeighbMidHigh){
+    house3[i,"NH"]<-"MidHigh"
+  } else if(house3[i,"Neighborhood"]%in%NeighbHigh){
+    house3[i,"NH"]<-"High"
+  }
+}
+house3$NH <- factor(house3$NH)
+```
+
+```{r}
+#New SaleType Variable
+house3$ST <- rep(NA,nrow(house3))
+for(i in 1:dim(house3)[1]){
+  if(house3[i,"SaleType"]%in%SaleLow){
+    house3[i,"ST"]<-"Low"
+  } else if(house3[i,"SaleType"]%in%SaleHigh){
+    house3[i,"ST"]<-"High"
+  }
+}
+house3$ST <- factor(house3$ST)
+```
+
+```{r}
+house3$Ext1st <- rep(NA,nrow(house3))
+for(i in 1:dim(house3)[1]){
+  if(house3[i,"Exterior1st"]%in%ExtLow){
+    house3[i,"Ext1st"]<-"Low"
+  } else if(house3[i,"Exterior1st"]%in%ExtMid){
+    house3[i,"Ext1st"]<-"Mid"
+  } else if(house3[i,"Exterior1st"]%in%ExtHigh){
+    house3[i,"Ext1st"]<-"High"
+  }
+}
+house3$Ext1st <- factor(house3$Ext1st)
+```
+
+```{r}
+house3$bsmt <- house3$BsmtQual
+levels(house3$bsmt) <- c("Ex", "Fa", "Gd", "TA", "No")
+house3$bsmt[which(is.na(house3$bsmt))] <- "No"
+levels(house3$bsmt)<-c("Ex", "FairNo", "Gd", "TA", "FairNo")
+summary(house3$bsmt)
+```
+
+```{r}
+house3$extQu <- house3$ExterQual
+levels(house3$extQu) <- c("Good", "Average", "Good", "Average")
+summary(house3$extQu)
+```
+
+```{r}
+house3$kitQu <- house3$KitchenQual
+levels(house3$kitQu) <- c("Good", "Average", "Good", "Average")
+summary(house3$kitQu)
+```
+
+```{r}
+#Remove redundant categorical variables since we created new ones
+house4<-house3
+remove<-c("KitchenQual","ExterQual","BsmtQual","Exterior1st","Neighborhood","SaleType")
+house4<-house4[,!(names(house4) %in% remove)]
+```
+
+###Creating submission csv
+```{r}
+gamdata<-house4[!complete.cases(house4),]
+forestdata<-house4[complete.cases(house4),]
+gamindex<- gamdata$Id
+forestindex<-forestdata$Id
+
+
+forestPreds<-data.frame(predict(rForest,forestdata))
+gamPreds<-data.frame(predict(finalGAM,newdata=gamdata))
+
+
+forestPreds<-cbind.data.frame(forestindex,forestPreds)
+gamPreds<-cbind.data.frame(gamindex,gamPreds)
+final<-rbind.data.frame(forestPreds, gamPreds)
+names(final) <- c("Id", "SalePrice")
+submission <- final[order(final$Id),] 
+write.csv(submission,file="submission.csv", row.names=FALSE)
+```
+
+
+
+
+###Plots
+```{r}
+qplot(x=Var1, y=Var2, data=melt(cor(house.numeric)),fill=value,geom="tile",las=2)
+qplot(x=Var1, y=Var2, data=melt(cor(selectvars)), fill=value, geom="tile",las=2)
+boxplot(SalePrice~Neighborhood, data=house, las=2)
+```
+
