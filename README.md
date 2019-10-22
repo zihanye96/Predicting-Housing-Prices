@@ -3,7 +3,7 @@
 This repository contains the necessary code to reproduce my submission for a Kaggle competition called 
 "House Prices: Advanced Regression Techniques", where I used generalized additive models, regression trees,
 random forests, and neural networks in order to determine a model that accurately predicts home prices using the
-provided information.
+provided information. [More information on the competition](https://www.kaggle.com/c/house-prices-advanced-regression-techniques)
 
 ## Introduction
 The dataset for this competition contains information on 1,460 residential homes in Ames, Iowa. The dataset includes 80 variables, such as the price that the home was sold for and characteristics of the house such as basement quality, overall square footage, and the exterior covering on the house. My goal for this project is to create a model that can predict the response variable (sale price) most accurately with a (relatively) small number of predictor variables. This means that the predictor variables used in this model won’t be redundant and will have low correlation with each other. I created the "best model" using manual feature selection, choosing only the variables that appeared to have a strong effect on sale price and modifying certain categorical variables so that their levels are more intuitive. That way, I can achieve a balance between accuracy and complexity.
